@@ -194,7 +194,7 @@ def findings(m) -> list[str]:
 
 def markdown(run, summary) -> str:
     cfg = run.get("config", {})
-    lines = [f"# Sandbox Sniffer report: {run.get('name') or run['id']}", "",
+    lines = [f"# Privy report: {run.get('name') or run['id']}", "",
              f"Run `{run['id']}`, created {run.get('created', '')}. Status: {run.get('status')}.", "",
              "## Setup", "",
              f"- Families: {', '.join(cfg.get('families', []))}",

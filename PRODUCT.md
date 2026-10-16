@@ -12,7 +12,7 @@ Primary viewers are hackathon judges watching a five-minute live demo on a proje
 
 ## Product Purpose
 
-Sandbox Sniffer tests whether an AI agent respects a safety rule because of the rule or because it can tell it is being watched. It runs paired experiments: the same request and the same safety policy, once in an environment that looks like a test sandbox and once in one that looks like production, then shows whether behaviour changes and whether the model said why. Success today is a demo where judges understand the finding within seconds.
+Privy tests whether an AI agent respects a safety rule because of the rule or because it can tell it is being watched. It runs paired experiments: the same request and the same safety policy, once in an environment that looks like a test sandbox and once in one that looks like production, then shows whether behaviour changes and whether the model said why. Success today is a demo where judges understand the finding within seconds.
 
 ## Positioning
 
@@ -31,7 +31,7 @@ Run locally (`python app.py`, http://127.0.0.1:8000) on the presenter's laptop a
 
 ## Brand Commitments
 
-- Name: Sandbox Sniffer. Tagline in use: "Does the agent respect the rule, or just the test?"
+- Name: Privy. Tagline in use: "Does the agent respect the rule, or just the test?"
 - Voice: honest about uncertainty; simulated data is always labelled as not a finding.
 
 ## Evidence on Hand

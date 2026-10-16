@@ -1,5 +1,5 @@
 "use strict";
-/* Sandbox Sniffer front end. Plain JS, no dependencies.
+/* Privy front end. Plain JS, no dependencies.
    Everything that came from a model or a provider is inserted with textContent. */
 
 // ------------------------------------------------------------------ helpers
@@ -57,7 +57,7 @@ async function api(path, opts = {}) {
   if (init.body && typeof init.body !== "string") init.body = JSON.stringify(init.body);
   let r;
   try { r = await fetch(path, init); }
-  catch (_) { throw new Error("Can't reach the Sandbox Sniffer server. Check that python app.py is still running, then try again."); }
+  catch (_) { throw new Error("Can't reach the Privy server. Check that python app.py is still running, then try again."); }
   if (!r.ok) {
     let msg = r.status >= 500
       ? `The server hit an error (${r.status}). The terminal running python app.py has the details.`

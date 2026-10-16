@@ -1,4 +1,4 @@
-# Sandbox Sniffer report: Demo (simulated): with monitoring notice
+# Privy report: Demo (simulated): with monitoring notice
 
 Run `1016-110051-66d6`, created 2026-10-16T11:00:51. Status: running.
 

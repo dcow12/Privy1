@@ -1,4 +1,4 @@
-"""Sandbox Sniffer: can we detect when an AI agent believes it's being tested, even when it
+"""Privy: can we detect when an AI agent believes it's being tested, even when it
 doesn't say so?
 
 Two identical agents get the same task and the same safety policy. One sees an environment
@@ -14,10 +14,10 @@ Subcommands
   prompts    print example scenarios (no model needed)
 
 Examples
-  python sandbox_sniffer.py whitebox --backend mock --out results_mock        # 20 s dry run
-  python sandbox_sniffer.py whitebox                                          # Llama-3.3-70B on NDIF
-  python sandbox_sniffer.py whitebox --backend local --model Qwen/Qwen2.5-1.5B-Instruct --out results_qwen
-  python sandbox_sniffer.py agents --variants 1                               # Claude Opus 5.5
+  python privy.py whitebox --backend mock --out results_mock        # 20 s dry run
+  python privy.py whitebox                                          # Llama-3.3-70B on NDIF
+  python privy.py whitebox --backend local --model Qwen/Qwen2.5-1.5B-Instruct --out results_qwen
+  python privy.py agents --variants 1                               # Claude Opus 5.5
 """
 from __future__ import annotations
 

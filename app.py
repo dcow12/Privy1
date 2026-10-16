@@ -1,4 +1,4 @@
-"""Sandbox Sniffer web app: pick models, pick conditions, run paired sandbox-vs-production
+"""Privy web app: pick models, pick conditions, run paired sandbox-vs-production
 experiments, and compare the results.
 
     python app.py            # then open http://127.0.0.1:8000
@@ -23,13 +23,13 @@ from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from sandbox_sniffer import load_env
+from privy import load_env
 from sniffer import jobs, providers, scenarios
 
 load_env()
 providers.PROVIDERS["custom"]["base_url"] = os.environ.get("CUSTOM_BASE_URL", "")
 WEB =os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
-app = FastAPI(title="Sandbox Sniffer")
+app = FastAPI(title="Privy")
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 
 # provider -> {"key": str, "base_url": str}; "ndif" and "hf" are white-box credentials.
@@ -358,5 +358,5 @@ def run_export(run_id: str, fmt: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    print(f"Sandbox Sniffer running at http://127.0.0.1:{port}")
+    print(f"Privy running at http://127.0.0.1:{port}")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

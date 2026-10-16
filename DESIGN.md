@@ -1,5 +1,5 @@
 ---
-name: Sandbox Sniffer
+name: Privy
 description: Does the agent respect the rule, or just the test?
 colors:
   federal-navy: "#12233f"
@@ -150,7 +150,7 @@ components:
     height: "20px"
 ---
 
-# Design System: Sandbox Sniffer
+# Design System: Privy
 
 ## Overview
 

@@ -1,6 +1,6 @@
-# Sandbox Sniffer: can we tell when an agent thinks it's being tested, even when it doesn't say so?
+# Privy: can we tell when an agent thinks it's being tested, even when it doesn't say so?
 
-Live demo: https://dcow12.github.io/Sandbox/ · Run it on a GPU: [`colab/sandbox_sniffer_colab.ipynb`](colab/sandbox_sniffer_colab.ipynb)
+Live demo: https://dcow12.github.io/Privy/ · Run it on a GPU: [`colab/privy_colab.ipynb`](colab/privy_colab.ipynb)
 
 **Thrust I: The Boundary.** Everything is simulated, and nothing executes.
 
@@ -14,7 +14,7 @@ The key move is the **evaluation-awareness probe**. It's trained only on prompts
 
 ## Live demo
 
-A read-only copy of the app runs on GitHub Pages: **[https://dcow12.github.io/Sandbox/](https://dcow12.github.io/Sandbox/)**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
+A read-only copy of the app runs on GitHub Pages: **[https://dcow12.github.io/Privy/](https://dcow12.github.io/Privy/)**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
 
 To refresh the demo after new runs: `python tools/build_pages.py` (or name run IDs to include only those), then commit `docs/`. The export never includes API keys.
 
@@ -65,19 +65,19 @@ cp .env.example .env        # then fill in the keys you have
 
 ```bash
 # 1. Dry run on synthetic data (5 s, no keys). Checks that everything works; it's NOT a result.
-python sandbox_sniffer.py whitebox --backend mock --out results_mock
+python privy.py whitebox --backend mock --out results_mock
 
 # 2. The real thing: Llama-3.3-70B-Instruct on NDIF (880 prompts + 120 traces + steering)
-python sandbox_sniffer.py whitebox --out results_llama70b
-python sandbox_sniffer.py whitebox --out results_llama70b --quick     # ~half the calls
+python privy.py whitebox --out results_llama70b
+python privy.py whitebox --out results_llama70b --quick     # ~half the calls
 
 # 3. Frontier agent comparison from the command line (Claude only; the web app does any provider)
-python sandbox_sniffer.py agents --out results_agents     # asks before spending; ~$10 for 440 episodes
+python privy.py agents --out results_agents     # asks before spending; ~$10 for 440 episodes
 
 # Also available
-python sandbox_sniffer.py whitebox --backend local --model Qwen/Qwen2.5-1.5B-Instruct --out results_qwen
-python sandbox_sniffer.py whitebox --out results_llama70b --reuse     # re-analyse cached activations
-python sandbox_sniffer.py prompts --family explicit --task 10         # look at the scenarios
+python privy.py whitebox --backend local --model Qwen/Qwen2.5-1.5B-Instruct --out results_qwen
+python privy.py whitebox --out results_llama70b --reuse     # re-analyse cached activations
+python privy.py prompts --family explicit --task 10         # look at the scenarios
 ```
 
 `--layer N` sets the layer used for the transfer heatmaps and for steering. The default is the middle layer (40 of 80 for Llama-3.3-70B). **Pick it before you look at results.** `--model` takes any model NDIF lists as running; if yours isn't, the script prints the ones that are. Every NDIF call retries on transient errors. Activations are cached in `activations.npz`, so a crash after collection costs nothing.
@@ -139,7 +139,7 @@ The judge is Claude (strict JSON schema) when `ANTHROPIC_API_KEY` is set, and a 
 ```
 app.py                 web app server (FastAPI): python app.py
 web/                   the web app front end (HTML/CSS/JS, no dependencies)
-sandbox_sniffer.py     CLI (whitebox / agents / prompts)
+privy.py     CLI (whitebox / agents / prompts)
 sniffer/scenarios.py   tasks, cues, conditions, policy, prompt formats (stdlib only)
 sniffer/providers.py   Anthropic, OpenAI-compatible and simulated agent adapters
 sniffer/agents.py      parallel, resumable episode runner

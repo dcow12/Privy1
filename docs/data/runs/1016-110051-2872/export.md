@@ -1,4 +1,4 @@
-# Sandbox Sniffer report: Demo (simulated): three agent types
+# Privy report: Demo (simulated): three agent types
 
 Run `1016-110051-2872`, created 2026-10-16T11:00:51. Status: running.
 

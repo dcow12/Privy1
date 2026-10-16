@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-10-16T18:44:28+00:00",
-  "title": "Design System: Sandbox Sniffer",
+  "title": "Design System: Privy",
   "extensions": {
     "colorMeta": {
       "federal-navy": {
@@ -428,7 +428,7 @@
       "kind": "nav",
       "refersTo": "topbar",
       "description": "64px navy bar with name, tagline and underlined tabs.",
-      "html": "<header class=\"ds-bar\"><div><div class=\"ds-name\">Sandbox Sniffer</div><div class=\"ds-sub\">Does the agent respect the rule, or just the test?</div></div><nav class=\"ds-tabs\"><button class=\"ds-tab\">Keys</button><button class=\"ds-tab\">New experiment</button><button class=\"ds-tab\">Inside the model</button><button class=\"ds-tab\" aria-selected=\"true\">Results <span class=\"ds-badge\">2</span></button></nav></header>",
+      "html": "<header class=\"ds-bar\"><div><div class=\"ds-name\">Privy</div><div class=\"ds-sub\">Does the agent respect the rule, or just the test?</div></div><nav class=\"ds-tabs\"><button class=\"ds-tab\">Keys</button><button class=\"ds-tab\">New experiment</button><button class=\"ds-tab\">Inside the model</button><button class=\"ds-tab\" aria-selected=\"true\">Results <span class=\"ds-badge\">2</span></button></nav></header>",
       "css": ":host{--navy:#12233f;--navy-2:#1f3a63;--navy-soft:#b8c4d8;--ground:#eef1f5;--ink:#0f172a;--ink-2:#475467;--muted:#667085;--axis:#98a2b3;--rule:#d0d5dd;--rule-2:#e4e7ec;--wash:#f2f4f7;--critical:#b42318;--caution:#b54708;--cleared:#067647;--m1:#2a78d6;--m2:#eb6834;--m3:#1baf7a;--font:\"Public Sans\",system-ui,-apple-system,\"Segoe UI\",sans-serif;font-family:var(--font);font-variant-numeric:tabular-nums;color:var(--ink);} .ds-bar{height:64px;display:flex;align-items:stretch;gap:44px;padding:0 32px;background:var(--navy);color:#fff;} .ds-bar>div{display:flex;flex-direction:column;justify-content:center;} .ds-name{font-weight:800;font-size:19px;letter-spacing:-.01em;line-height:1.15;} .ds-sub{font-size:14px;font-weight:500;color:var(--navy-soft);} .ds-tabs{display:flex;gap:2px;} .ds-tab{display:inline-flex;align-items:center;gap:8px;padding:3px 16px 0;border:0;border-bottom:3px solid transparent;background:none;color:var(--navy-soft);font:600 15px var(--font);cursor:pointer;} .ds-tab:hover{color:#fff;} .ds-tab[aria-selected=true]{color:#fff;border-bottom-color:#fff;} .ds-tab:focus-visible{outline:3px solid #fff;outline-offset:-3px;} .ds-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#fff;color:var(--navy);font-size:12px;font-weight:800;}"
     },
     {

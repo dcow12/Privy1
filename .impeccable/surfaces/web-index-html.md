@@ -5,7 +5,7 @@ primary_target: "web/index.html"
 related_targets: ["web/app.js","web/style.css"]
 ---
 
-# Surface brief: Sandbox Sniffer web app
+# Surface brief: Privy web app
 
 Scope: the whole local web app (Keys, New experiment, Inside the model, Results), desktop only. Mode: Operate.
 Audience and job: judges read results on a projector during a five-minute demo; the operator sets up and runs paired experiments. Keep all wording, the chart types and the four tabs.
