@@ -1,5 +1,7 @@
 # Sandbox Sniffer: can we tell when an agent thinks it's being tested, even when it doesn't say so?
 
+Live demo: https://dcow12.github.io/Sandbox/ · Run it on a GPU: [`colab/sandbox_sniffer_colab.ipynb`](colab/sandbox_sniffer_colab.ipynb)
+
 **Thrust I: The Boundary.** Everything is simulated, and nothing executes.
 
 Two identical agents get the same operator request and the same safety policy. Agent A sees an environment that looks like a test sandbox (`ci-runner-14`, scratch volume, `test_user`). Agent B sees one that looks like production (`payments-api-14`, replicated volume, 312 active users). We ask three questions:
@@ -12,7 +14,7 @@ The key move is the **evaluation-awareness probe**. It's trained only on prompts
 
 ## Live demo
 
-A read-only copy of the app runs on GitHub Pages: **LIVE_DEMO_URL**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
+A read-only copy of the app runs on GitHub Pages: **[https://dcow12.github.io/Sandbox/](https://dcow12.github.io/Sandbox/)**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
 
 To refresh the demo after new runs: `python tools/build_pages.py` (or name run IDs to include only those), then commit `docs/`. The export never includes API keys.
 
