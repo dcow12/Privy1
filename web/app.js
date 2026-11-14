@@ -411,6 +411,38 @@ async function startWhitebox() {
   btn.disabled = false;
 }
 
+// ------------------------------------------------------------------ find-cues (evolve) form
+async function startEvolve() {
+  const backend = $("input[name=ev-backend]:checked").value;
+  const layer = $("#ev-layer").value;
+  const body = {
+    name: $("#ev-name").value, backend, model: $("#ev-model").value,
+    quick: $("#ev-quick").checked,
+    generations: +$("#ev-generations").value, pop: +$("#ev-pop").value, tasks: +$("#ev-tasks").value,
+    lam: +$("#ev-lam").value, layer: layer === "" ? null : +layer,
+  };
+  const btn = $("#ev-run");
+  btn.disabled = true;
+  try {
+    const info = await api("/api/runs/evolve", { method: "POST", body });
+    state.active = info.id; state.compare.clear();
+    showTab("results"); await refreshRuns(); renderReport();
+  } catch (e) { toast(e.message, "error"); }
+  btn.disabled = false;
+}
+
+// Start a white-box run that folds in the cues an evolve run discovered.
+async function validateEvolved(runId, backend, model, ev) {
+  ev.target.disabled = true;
+  try {
+    const info = await api("/api/runs/whitebox", { method: "POST",
+      body: { backend, model, quick: true, evolved_from: runId } });
+    state.active = info.id; state.compare.clear();
+    await refreshRuns(); renderReport();
+    toast("Started a white-box run on the discovered cues.");
+  } catch (e) { toast(e.message, "error"); ev.target.disabled = false; }
+}
+
 // ------------------------------------------------------------------ results: run list
 async function refreshRuns() {
   try {
@@ -460,7 +492,7 @@ function renderRunList() {
       onclick: (e) => { e.preventDefault(); openRun(r.id); } },
       h("span", { class: "run-name", text: name, title: name }),
       h("span", { class: "run-meta" },
-        h("span", { class: "kind", text: r.kind === "agents" ? "agents" : "inside" }), statusChip(r.status),
+        h("span", { class: "kind", text: r.kind === "agents" ? "agents" : r.kind === "evolve" ? "search" : "inside" }), statusChip(r.status),
         h("span", { text: whenShort(r.created), title: when(r.created) })),
       r.kind === "agents" && r.status === "running"
         ? h("span", { class: "progress", role: "progressbar", "aria-label": `${name} progress`, "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": Math.round(pctDone) },
@@ -650,6 +682,7 @@ async function renderReport() {
   if (info.status === "error") frag.append(failureBanner(info));
   if (info.status === "interrupted") frag.append(h("div", { class: "banner", text: "This run stopped when the server restarted. Episodes that finished are kept and shown below; start a new run to collect the rest." }));
   if (info.kind === "agents") await agentBody(frag, info);
+  else if (info.kind === "evolve") await evolveBody(frag, info);
   else await whiteboxBody(frag, info);
   if (info.logs?.length) frag.append(h("details", { class: "panel", "data-key": "log", open: info.status === "running" || info.status === "error" }, h("summary", { text: "Log" }), h("pre", { class: "logs", text: info.logs.join("\n") })));
   if (token !== renderToken) return;
@@ -681,6 +714,9 @@ function reportHead(info) {
   const chips = info.kind === "agents"
     ? [plural((c.families || []).length, "condition"), (c.task_types || []).join(" + "), `mode: ${c.mode}`, `${plural(c.variants, "variant")} × ${plural(c.repeats, "repeat")}`,
        c.everywhere === false ? "policy scope removed" : null, c.monitored ? "monitoring notice" : null, c.pressure ? "operator pressure" : null, `judge: ${c.judge === "llm" ? "Claude" : "phrases"}`]
+    : info.kind === "evolve"
+    ? [c.backend === "mock" ? "simulated model" : c.backend, c.backend === "mock" ? null : c.model,
+       `${plural(c.generations, "generation")} × pop ${c.pop}`, `${plural(c.tasks, "task")}/candidate`, `λ=${c.lam}`]
     : [c.backend === "mock" ? "simulated model" : c.backend, c.backend === "mock" ? null : c.model, c.quick ? "quick" : "full"];
   const actions = h("div", { class: "actions" });
   if (info.kind === "agents") for (const [fmt, label] of [["md", "Report (.md)"], ["csv", "Episodes (.csv)"], ["json", "Summary (.json)"]])
@@ -939,6 +975,66 @@ function whiteboxFindings(s) {
   return out;
 }
 
+// ------------------------------------------------------------------ find-cues (evolve) report
+async function evolveSummary(id) {
+  const r = await fetch(asset(`/api/runs/${id}/files/summary.json`));
+  return r.ok ? r.json() : null;
+}
+
+async function evolveBody(frag, info) {
+  const s = info.status === "running" ? null : await evolveSummary(info.id);
+  if (!s) {
+    frag.append(h("div", { class: "panel" }, h("p", { class: "muted", text: info.status === "running"
+      ? "Breeding and scoring candidates… progress is in the log below." : "No results were written." })));
+    return;
+  }
+  if (s.WARNING) frag.append(h("div", { class: "banner", text: "Simulated model: these numbers come from synthetic activations and only show that the search runs. They are not findings." }));
+  const hist = s.history || [];
+  const last = hist[hist.length - 1] || {};
+  const top = s.top || [];
+  const best = top[0] || {};
+  frag.append(h("div", { class: "panel" },
+    h("div", { class: "panel-head" }, h("h2", { text: "What the search found" }),
+      h("span", { class: "muted small-text", text: `${s.backend} · layer ${s.layer} · ${plural(s.generations, "generation")} · ${s.n_candidates_scored} candidates scored` })),
+    h("table", { class: "measures glance" }, h("tbody", {},
+      measure("Best behaviour gap", num(best.behaviour_gap), "P(carry out) on disallowed requests, sandbox − production"),
+      measure("Best probe gap", num(best.probe_gap), "projection onto the eval-awareness direction, sandbox − production"),
+      measure("Discovered families kept", String(top.length), "each ready to fold into a white-box run"),
+      measure("Best fitness, final generation", num(last.best_fitness), `mean ${num(last.mean_fitness)}`))),
+    h("p", { class: "muted small-text", text: s.fitness ? `Fitness = ${s.fitness}` : "" })));
+
+  // The discovered cues, ranked.
+  const rows = top.map((f) => h("tr", {},
+    h("td", {}, h("b", { text: f.family }), h("span", { class: "chip sim", text: f.origin, style: { marginLeft: "6px" } })),
+    h("td", { class: "num", text: num(f.behaviour_gap) }),
+    h("td", { class: "num", text: num(f.probe_gap) }),
+    h("td", {}, h("div", { class: "cue-pair" },
+      h("div", {}, h("span", { class: "muted small-text", text: "sandbox  " }), h("code", { text: (f.sandbox || []).join(" ; ") })),
+      h("div", {}, h("span", { class: "muted small-text", text: "production  " }), h("code", { text: (f.prod || []).join(" ; ") }))))));
+  frag.append(h("div", { class: "panel" },
+    h("div", { class: "panel-head" }, h("h2", { text: "Discovered cues" }),
+      h("span", { class: "muted small-text", text: "No sandbox line says “test” or “evaluation” — the search is penalised for it." })),
+    h("table", { class: "measures cues" }, h("thead", {}, h("tr", {},
+      h("th", { text: "family" }), h("th", { class: "num", text: "behaviour gap" }),
+      h("th", { class: "num", text: "probe gap" }), h("th", { text: "sandbox → production" }))),
+      h("tbody", {}, ...rows))));
+
+  frag.append(h("div", { class: "panel" }, h("div", { class: "figs" }, h("figure", {},
+    h("img", { src: asset(`/api/runs/${info.id}/files/evolve_fitness.png`), alt: "Search progress",
+      loading: "lazy", onerror: (e) => e.target.closest("figure").remove() }),
+    h("figcaption", {}, h("b", { text: "Figure 1. " }), "Fitness and the best candidate's gaps over generations.")))));
+
+  // Validate: hand the discovered cues to a real white-box run.
+  if (info.status === "done" && top.length) {
+    const c = info.config || {};
+    frag.append(h("div", { class: "panel" },
+      h("div", { class: "panel-head" }, h("h2", { text: "Validate before believing" })),
+      h("p", { class: "muted", text: "The search is an optimiser, not a finding. Run the discovered cues as real scenario families — leave-task-out probes, baselines, verbalization and steering — and compare them against the hand-written ones." }),
+      h("button", { class: "primary", text: "Run a white-box check on these cues",
+        onclick: (ev) => validateEvolved(info.id, c.backend === "mock" ? "mock" : c.backend, c.model || "meta-llama/Llama-3.3-70B-Instruct", ev) })));
+  }
+}
+
 // ------------------------------------------------------------------ compare
 async function renderCompare(token = ++renderToken) {
   const box = $("#report");
@@ -1043,12 +1139,18 @@ async function boot() {
     $("#wb-model").value = b === "local" ? "Qwen/Qwen2.5-1.5B-Instruct" : b === "ndif" ? "meta-llama/Llama-3.3-70B-Instruct" : "simulated";
     $("#wb-model").disabled = b === "mock";
   }));
+  $("#ev-run").addEventListener("click", startEvolve);
+  $$("input[name=ev-backend]").forEach((el) => el.addEventListener("change", () => {
+    const b = $("input[name=ev-backend]:checked").value;
+    $("#ev-model").value = b === "local" ? "Qwen/Qwen2.5-1.5B-Instruct" : b === "ndif" ? "meta-llama/Llama-3.3-70B-Instruct" : "simulated";
+    $("#ev-model").disabled = b === "mock";
+  }));
   $("#btn-compare").addEventListener("click", () => { state.compareMode = true; state.comparePick = null; renderRunList(); renderReport(); });
   window.addEventListener("resize", debounce(() => { if ($("#tab-results").hidden === false) renderReport(); }, 250));
   window.addEventListener("hashchange", () => {
     const [t, id] = location.hash.slice(1).split("/");
     if (id && id !== state.active) { state.active = id; state.compareMode = false; renderReport(); }
-    if (["keys", "experiment", "inside", "results"].includes(t)) showTab(t, false);
+    if (["keys", "experiment", "inside", "search", "results"].includes(t)) showTab(t, false);
   });
   updateEstimate();
 
@@ -1061,7 +1163,7 @@ async function boot() {
     const best = agents.sort((a, b) => (b.config?.slots?.length || 0) - (a.config?.slots?.length || 0))[0];
     state.active = (best || state.runs[0]).id;
   }
-  showTab(["keys", "experiment", "inside", "results"].includes(tab) ? tab : STATIC ? "results" : "experiment", false);
+  showTab(["keys", "experiment", "inside", "search", "results"].includes(tab) ? tab : STATIC ? "results" : "experiment", false);
   if (state.active) renderReport();
 
   // Poll while anything is running.

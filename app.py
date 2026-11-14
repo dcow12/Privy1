@@ -258,6 +258,7 @@ class WhiteboxIn(BaseModel):
     skip_steering: bool = False
     layer: int | None = None
     judge: str = "regex"
+    evolved_from: str = ""   # a run_id from an `evolve` run, to fold its discovered cues in
 
 
 @app.post("/api/runs/whitebox")
@@ -269,8 +270,45 @@ def run_whitebox(w: WhiteboxIn):
     cfg = {"backend": w.backend, "model": w.model.strip(), "quick": w.quick,
            "skip_verbal": w.skip_verbal, "skip_steering": w.skip_steering, "layer": w.layer,
            "judge": w.judge}
-    name = (w.name.strip() or ("Simulated model" if w.backend == "mock" else w.model.split("/")[-1]))[:120]
+    evolved_name = ""
+    if w.evolved_from.strip():
+        src = w.evolved_from.strip()
+        if not RUN_ID.match(src):
+            raise HTTPException(400, "Bad evolved_from run id")
+        cue_file = jobs.RUNS / src / "evolved_cues.json"
+        if not cue_file.exists():
+            raise HTTPException(404, "That search run has no evolved_cues.json yet.")
+        cfg["evolved"] = str(cue_file)
+        evolved_name = "Validate: "
+    name = (w.name.strip() or evolved_name + ("Simulated model" if w.backend == "mock"
+            else w.model.split("/")[-1]))[:120]
     job = jobs.start_whitebox(name, cfg, KEYS.get("anthropic", {}).get("key"))
+    return job.info()
+
+
+class EvolveIn(BaseModel):
+    name: str = ""
+    backend: str = "ndif"
+    model: str = "meta-llama/Llama-3.3-70B-Instruct"
+    generations: int = Field(5, ge=1, le=20)
+    pop: int = Field(16, ge=4, le=64)
+    tasks: int = Field(6, ge=2, le=20)
+    lam: float = Field(1.0, ge=0.0, le=5.0)
+    layer: int | None = None
+    quick: bool = False
+
+
+@app.post("/api/runs/evolve")
+def run_evolve(e: EvolveIn):
+    if e.backend not in ("ndif", "local", "mock"):
+        raise HTTPException(400, "backend must be ndif, local or mock")
+    if e.backend == "ndif" and "ndif" not in KEYS:
+        raise HTTPException(400, "Add an NDIF key first (free at login.ndif.us).")
+    cfg = {"backend": e.backend, "model": e.model.strip(), "generations": e.generations,
+           "pop": e.pop, "tasks": e.tasks, "lam": e.lam, "layer": e.layer, "quick": e.quick}
+    name = (e.name.strip() or ("Cue search (simulated)" if e.backend == "mock"
+            else "Cue search · " + e.model.split("/")[-1]))[:120]
+    job = jobs.start_evolve(name, cfg)
     return job.info()
 
 

@@ -6,7 +6,7 @@
   <title>Privy</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='13' cy='13' r='8' fill='none' stroke='%2312233f' stroke-width='3'/%3E%3Cpath d='M19 19l8 8' stroke='%2312233f' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
   <link rel="preload" href="/static/fonts/PublicSans-ExtraBold.woff2" as="font" type="font/woff2" crossorigin>
-  <link id="app-css" rel="stylesheet" href="/static/style.css?v=14">
+  <link id="app-css" rel="stylesheet" href="/static/style.css?v=16">
   <script>
     // The previous design is kept as a backup: add ?design=classic to the URL to use it.
     try {
@@ -28,6 +28,7 @@
       <button role="tab" id="tabbtn-keys" aria-controls="tab-keys" data-tab="keys"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>Keys</button>
       <button role="tab" id="tabbtn-experiment" aria-controls="tab-experiment" data-tab="experiment"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2v7.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V2"/><path d="M8.5 2h7"/><path d="M7 16h10"/></svg>New experiment</button>
       <button role="tab" id="tabbtn-inside" aria-controls="tab-inside" data-tab="inside"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></svg>Inside the model</button>
+      <button role="tab" id="tabbtn-search" aria-controls="tab-search" data-tab="search"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6M8 11h6"/></svg>Find cues</button>
       <button role="tab" id="tabbtn-results" aria-controls="tab-results" data-tab="results"><svg class="ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Results <span id="running-badge" class="badge" hidden></span></button>
     </nav>
     <button id="theme-toggle" class="ghost" title="Switch theme" aria-label="Switch theme"></button>
@@ -150,6 +151,41 @@
       </div>
     </section>
 
+    <!-- ======================================================== FIND CUES -->
+    <section id="tab-search" role="tabpanel" aria-labelledby="tabbtn-search" class="tab" hidden>
+      <div class="intro">
+        <h1>Let the model find the cues</h1>
+        <p>The six conditions in <i>New experiment</i> are hand-written guesses at what reads as a sandbox. This view stops guessing: the open model <b>writes</b> new environment snapshots itself, recombining them with a seed corpus, and each candidate is scored by the model's own activations. It keeps the ones that most make the model read a scene as a test — and act on it — while never using the words <i>test</i> or <i>evaluation</i>, then breeds the next round from them.</p>
+      </div>
+      <div class="step two-col">
+        <div>
+          <div class="step-head"><h2>Model</h2></div>
+          <label class="check"><input type="radio" name="ev-backend" value="ndif" checked> <span><b>NDIF (remote GPUs)</b><br><span class="muted">Llama-3.3-70B writes the cues and is read for scoring. Needs an NDIF key.</span></span></label>
+          <label class="check"><input type="radio" name="ev-backend" value="mock"> <span><b>Simulated model</b><br><span class="muted">Key-free dry run. The search still runs, on synthetic activations; not a finding.</span></span></label>
+          <label class="check"><input type="radio" name="ev-backend" value="local"> <span><b>This computer</b><br><span class="muted">Small models only, e.g. Qwen/Qwen2.5-1.5B-Instruct.</span></span></label>
+          <label class="field">Model id <input id="ev-model" type="text" maxlength="200" list="wb-models" value="meta-llama/Llama-3.3-70B-Instruct"></label>
+        </div>
+        <div>
+          <div class="step-head"><h2>Search</h2></div>
+          <label class="check"><input type="checkbox" id="ev-quick"> <span><b>Quick search</b><br><span class="muted">3 generations, population 10, 4 tasks. Fewer forward passes.</span></span></label>
+          <div class="field-row">
+            <label class="field">Generations <input id="ev-generations" type="number" min="1" max="20" value="5"></label>
+            <label class="field">Population <input id="ev-pop" type="number" min="4" max="64" value="16"></label>
+          </div>
+          <div class="field-row">
+            <label class="field">Tasks per candidate <input id="ev-tasks" type="number" min="2" max="20" value="6"></label>
+            <label class="field">Layer <input id="ev-layer" type="number" min="0" placeholder="middle"></label>
+          </div>
+          <label class="field">Internal vs behaviour weight (λ) <input id="ev-lam" type="number" min="0" max="5" step="0.1" value="1.0"></label>
+          <label class="field">Run name <input id="ev-name" type="text" maxlength="120" placeholder="optional"></label>
+        </div>
+      </div>
+      <div class="runbar">
+        <div class="estimate muted">Each generation runs population × tasks × 2 forward passes. Remote runs take a few minutes per generation, depending on NDIF's queue. You can leave this page open.</div>
+        <button id="ev-run" class="primary">Run cue search</button>
+      </div>
+    </section>
+
     <!-- ======================================================== RESULTS -->
     <section id="tab-results" role="tabpanel" aria-labelledby="tabbtn-results" class="tab results-layout" hidden>
       <aside class="runlist">
@@ -164,6 +200,6 @@
   <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <div id="chart-live" class="sr-only" aria-live="polite"></div>
-  <script src="/static/app.js?v=13"></script>
+  <script src="/static/app.js?v=16"></script>
 </body>
 </html>

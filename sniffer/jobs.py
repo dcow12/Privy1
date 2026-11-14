@@ -237,3 +237,53 @@ def _whitebox_thread(job, args):
             return
         job.log(traceback.format_exc(limit=3))
         job.finish("error", f"{type(e).__name__}: {e}")
+
+
+# --------------------------------------------------------------------------- evolve
+
+EVOLVE_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruct", generations=5,
+                       pop=16, tasks=6, layer=None, lam=1.0, elite_frac=0.3, marker_penalty=0.5,
+                       neural_ask=12, top_k=5, seed=0, batch_size=None, device=None,
+                       module_paths=None, quick=False)
+
+
+def start_evolve(name, cfg):
+    args = Namespace(**{**EVOLVE_DEFAULTS, **cfg})
+    if args.quick:
+        args.generations, args.pop, args.tasks = 3, 10, 4
+    # Store the effective settings so the report's chips match what actually ran.
+    cfg = {**cfg, "generations": args.generations, "pop": args.pop, "tasks": args.tasks}
+    job = Job("evolve", name, cfg)
+    job.total = args.generations
+    args.out = str(job.dir)
+    job.save()
+    threading.Thread(target=_evolve_thread, args=(job, args), daemon=True).start()
+    return job
+
+
+def _evolve_thread(job, args):
+    from . import evolve
+
+    def log(*parts, **_):
+        job.log(*parts)
+        # Advance the progress bar as each generation is scored.
+        line = " ".join(str(p) for p in parts)
+        if line.startswith("Generation "):
+            try:
+                with job.lock:
+                    job.done = int(line.split()[1].rstrip(":")) + 1
+            except (ValueError, IndexError):
+                pass
+
+    try:
+        t0 = time.time()
+        evolve.run(args, log=log, should_stop=job.cancel.is_set)
+        job.done = job.total
+        job.log(f"Finished in {time.time() - t0:.0f}s.")
+        job.finish("done")
+    except BaseException as e:
+        if job.cancel.is_set():
+            job.finish("cancelled")
+            return
+        job.log(traceback.format_exc(limit=3))
+        job.finish("error", f"{type(e).__name__}: {e}")
