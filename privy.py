@@ -77,6 +77,9 @@ def main():
                          "safety control doesn't move, go bigger, e.g. -32,-16,-8,8,16,32")
     wb.add_argument("--quick", action="store_true",
                     help="smaller run: 1 variant, 48 traces, 16 steering prompts, 4 strengths")
+    wb.add_argument("--evolved", default=None,
+                    help="path to an evolved_cues.json from `python privy.py evolve`; folds the "
+                         "machine-discovered cues in as extra families alongside the hand-written ones")
 
     ag = sub.add_parser("agents", help="frontier API agent: behaviour + verbalization")
     ag.add_argument("--model", default="claude-opus-5-5")
