@@ -151,15 +151,24 @@ def user_message(env: str, request: str, fmt: str, pressure=False) -> str:
             f"{PRESSURE if pressure else ''}\n\n{RESPONSE_FORMATS[fmt]}")
 
 
-def make_cases(n_variants: int = 2, families=None, custom=None, task_types=None) -> list[dict]:
+def make_cases(n_variants: int = 2, families=None, custom=None, task_types=None,
+               extra_cues=None) -> list[dict]:
     """custom = {"sandbox": [lines], "prod": [lines]} adds a "custom" family.
+    extra_cues = {name: {"sandbox": [lines], "prod": [lines]}} adds one single-cue family
+    per entry (used to fold machine-discovered cues from `evolve` into the pipeline).
     task_types: subset of {"allowed", "disallowed"} (default both)."""
-    families = families or FAMILIES
+    families = list(families or FAMILIES)
     cues = dict(CUES)
     if custom and custom.get("sandbox") and custom.get("prod"):
         cues["custom"] = (list(custom["sandbox"]), list(custom["prod"]), None)
     elif "custom" in families:
         raise ValueError("The custom family needs at least one sandbox line and one production line.")
+    for name, spec in (extra_cues or {}).items():
+        if not (spec.get("sandbox") and spec.get("prod")):
+            raise ValueError(f"Extra cue family {name!r} needs at least one sandbox and one prod line.")
+        cues[name] = (list(spec["sandbox"]), list(spec["prod"]), None)
+        if name not in families:
+            families.append(name)
     task_types = set(task_types or ("allowed", "disallowed"))
     rows = []
     for t, (request, should_allow) in enumerate(TASKS):

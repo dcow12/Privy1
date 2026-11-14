@@ -279,9 +279,27 @@ class MockBackend:
         t = next(i for i, (req, _) in enumerate(scenarios.TASKS) if req in prompt)
         return t, scenarios.TASKS[t][1], pol
 
-    def _evalness(self, pol):
+    # Words that make a synthetic "this is a throwaway environment" signal, so the neural
+    # cue search (sniffer/evolve.py) has something to climb during key-free dry runs.
+    # Purely for testing the pipeline; it is not a claim about any real model.
+    _SB_WORDS = ("ci", "runner", "test", "dev", "scratch", "staging", "ephemeral", "qa", "tmpfs",
+                 "throwaway", "overlay", "ramdisk", "demo", "dummy", "example", "seed", "synthetic",
+                 "idle", "dry", "fixture", "pipeline", "waived", "none", "never", "0", "frozen")
+    _PR_WORDS = ("payments", "prod", "customer", "ledger", "checkout", "billing", "identity",
+                 "replicated", "persistent", "durable", "journaled", "mirror", "live", "active",
+                 "on-call", "vault", "alerting", "pager", "slo", "rps", "sessions", "migration",
+                 "ntp", "indefinite", "operator", "approvals", "review")
+
+    def _keyword_evalness(self, prompt):
+        low = prompt.lower()
+        sb = sum(low.count(w) for w in self._SB_WORDS)
+        pr = sum(low.count(w) for w in self._PR_WORDS)
+        return 0.22 * (sb - pr)
+
+    def _evalness(self, pol, prompt=""):
         s = sum(self.strength[c] * pol.get(c, 0) for c in scenarios.CUES)
-        return s + self.strength["sparse"] * (2 * pol["sparse"] - 1)
+        s += self.strength["sparse"] * (2 * pol["sparse"] - 1)
+        return s + self._keyword_evalness(prompt)
 
     def collect(self, prompts, layer_ids):
         H, E, P = [], [], []
@@ -289,7 +307,7 @@ class MockBackend:
         bump = np.exp(-((depth - 0.55) / 0.22) ** 2)
         for p in prompts:
             t, allow, pol = self._parse(p)
-            ev = self._evalness(pol)
+            ev = self._evalness(pol, p)
             base = self.task_vecs[t] + (1.2 if allow else -1.2) * self.allow_dir
             layers = []
             for L in layer_ids:
@@ -312,7 +330,7 @@ class MockBackend:
         out_p, out_m = [], []
         for p in prompts:
             t, allow, pol = self._parse(p)
-            logit = (3.0 if allow else -2.5) + (0 if allow else 0.45 * (self._evalness(pol) + push))
+            logit = (3.0 if allow else -2.5) + (0 if allow else 0.45 * (self._evalness(pol, p) + push))
             out_p.append(1 / (1 + np.exp(-logit)))
             out_m.append(0.93 * np.exp(-0.01 * float(vec @ vec) / 625))
         return np.array(out_p), np.array(out_m)
@@ -321,7 +339,7 @@ class MockBackend:
         out = []
         for p in prompts:
             t, allow, pol = self._parse(p)
-            ev = self._evalness(pol)
+            ev = self._evalness(pol, p)
             says = pol.get("explicit", 0) > 0 or (ev > 1.5 and self.rng.random() < 0.3)
             lead = ("This looks like a test environment rather than a real deployment. "
                     if says else "The request concerns the host described above. ")

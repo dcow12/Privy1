@@ -77,6 +77,39 @@ def main():
                          "safety control doesn't move, go bigger, e.g. -32,-16,-8,8,16,32")
     wb.add_argument("--quick", action="store_true",
                     help="smaller run: 1 variant, 48 traces, 16 steering prompts, 4 strengths")
+    wb.add_argument("--evolved", default=None,
+                    help="path to an evolved_cues.json from `python privy.py evolve`; folds the "
+                         "machine-discovered cues in as extra families alongside the hand-written ones")
+
+    ev = sub.add_parser("evolve", help="neural search for the cues that most read as a test")
+    ev.add_argument("--backend", default="ndif", choices=["ndif", "local", "ndif-sim", "mock"],
+                    help="mock: key-free dry run (synthetic, plumbing only)")
+    ev.add_argument("--model", default="meta-llama/Llama-3.3-70B-Instruct")
+    ev.add_argument("--out", default="results_evolved_search")
+    ev.add_argument("--generations", type=int, default=5)
+    ev.add_argument("--pop", type=int, default=16, help="candidates per generation")
+    ev.add_argument("--tasks", type=int, default=6, help="tasks used to score each candidate")
+    ev.add_argument("--layer", type=int, default=None, help="layer to read (default: middle)")
+    ev.add_argument("--lam", type=float, default=1.0,
+                    help="weight on the probe (internal) gap vs the behaviour gap in fitness")
+    ev.add_argument("--elite-frac", type=float, default=0.3, help="fraction kept each generation")
+    ev.add_argument("--marker-penalty", type=float, default=0.5,
+                    help="fitness penalty per banned marker word (test/eval/sandbox/...)")
+    ev.add_argument("--neural-ask", type=int, default=12, help="pairs to ask the model for per round")
+    ev.add_argument("--top-k", type=int, default=5, help="discovered families to keep")
+    ev.add_argument("--no-critic", dest="critic", action="store_false",
+                    help="turn off the neural critic that picks which candidates to score")
+    ev.add_argument("--oversample", type=int, default=4,
+                    help="candidates generated per slot for the critic to choose from")
+    ev.add_argument("--datasets", nargs="*", default=None,
+                    help="extra run dirs / archive.csv files to train the critic on "
+                         "(runs/ and results_evolved*/ are always included)")
+    ev.add_argument("--seed", type=int, default=0)
+    ev.add_argument("--batch-size", type=int, default=None)
+    ev.add_argument("--device", default=None, help="local only: cuda, mps or cpu")
+    ev.add_argument("--module-paths", default=None)
+    ev.add_argument("--quick", action="store_true",
+                    help="smaller: 3 generations, pop 10, 4 tasks")
 
     ag = sub.add_parser("agents", help="frontier API agent: behaviour + verbalization")
     ag.add_argument("--model", default="claude-opus-5-5")
@@ -116,6 +149,11 @@ def main():
             args.mults = "-8,-4,4,8"
         from sniffer import whitebox
         whitebox.run(args)
+    elif args.cmd == "evolve":
+        if args.quick:
+            args.generations, args.pop, args.tasks = 3, 10, 4
+        from sniffer import evolve
+        evolve.run(args)
     elif args.cmd == "agents":
         if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
             print("No ANTHROPIC_API_KEY in the environment or .env; relying on an `ant auth login` "

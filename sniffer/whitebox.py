@@ -83,7 +83,12 @@ def run(args, log=print, should_stop=lambda: False):
     backend.log, backend.should_stop = log, should_stop
     log(f"Backend: {backend.name}  ({backend.n_layers} layers)", flush=True)
 
-    df = pd.DataFrame(scenarios.make_cases(args.variants))
+    extra_cues = None
+    if getattr(args, "evolved", None):
+        raw = json.loads(Path(args.evolved).read_text())
+        extra_cues = {k: {"sandbox": v["sandbox"], "prod": v["prod"]} for k, v in raw.items()}
+        log(f"Folding in {len(extra_cues)} evolved cue families: {', '.join(extra_cues)}", flush=True)
+    df = pd.DataFrame(scenarios.make_cases(args.variants, extra_cues=extra_cues))
     df["prompt"] = [backend.render(scenarios.SYSTEM, scenarios.user_message(r.env, r.request, "choice"))
                     for r in df.itertuples()]
     chosen = args.layer if args.layer is not None else backend.n_layers // 2
