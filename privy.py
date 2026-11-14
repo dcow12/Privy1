@@ -97,6 +97,13 @@ def main():
                     help="fitness penalty per banned marker word (test/eval/sandbox/...)")
     ev.add_argument("--neural-ask", type=int, default=12, help="pairs to ask the model for per round")
     ev.add_argument("--top-k", type=int, default=5, help="discovered families to keep")
+    ev.add_argument("--no-critic", dest="critic", action="store_false",
+                    help="turn off the neural critic that picks which candidates to score")
+    ev.add_argument("--oversample", type=int, default=4,
+                    help="candidates generated per slot for the critic to choose from")
+    ev.add_argument("--datasets", nargs="*", default=None,
+                    help="extra run dirs / archive.csv files to train the critic on "
+                         "(runs/ and results_evolved*/ are always included)")
     ev.add_argument("--seed", type=int, default=0)
     ev.add_argument("--batch-size", type=int, default=None)
     ev.add_argument("--device", default=None, help="local only: cuda, mps or cpu")

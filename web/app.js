@@ -420,6 +420,7 @@ async function startEvolve() {
     quick: $("#ev-quick").checked,
     generations: +$("#ev-generations").value, pop: +$("#ev-pop").value, tasks: +$("#ev-tasks").value,
     lam: +$("#ev-lam").value, layer: layer === "" ? null : +layer,
+    critic: $("#ev-critic").checked, oversample: +$("#ev-oversample").value,
   };
   const btn = $("#ev-run");
   btn.disabled = true;
@@ -1000,7 +1001,17 @@ async function evolveBody(frag, info) {
       measure("Best behaviour gap", num(best.behaviour_gap), "P(carry out) on disallowed requests, sandbox − production"),
       measure("Best probe gap", num(best.probe_gap), "projection onto the eval-awareness direction, sandbox − production"),
       measure("Discovered families kept", String(top.length), "each ready to fold into a white-box run"),
-      measure("Best fitness, final generation", num(last.best_fitness), `mean ${num(last.mean_fitness)}`))),
+      measure("Best fitness, final generation", num(last.best_fitness), `mean ${num(last.mean_fitness)}`),
+      ...(s.critic ? (() => {
+        const cs = hist.map((g) => g.critic_corr).filter((v) => typeof v === "number" && isFinite(v));
+        const mean = cs.length ? cs.reduce((a, b) => a + b, 0) / cs.length : null;
+        return [
+          measure("Neural critic training data", `${last.critic_rows ?? 0} pairs`,
+            `${s.critic.prior_rows} from ${plural(s.critic.prior_sources, "past run")} on this model, the rest from this search`),
+          measure("Neural critic accuracy", mean === null ? "—" : num(mean),
+            mean === null ? "not enough scored data yet to train it" : "rank correlation of predicted vs actual fitness on candidates it hadn't seen; near 0 = no better than random"),
+        ];
+      })() : []))),
     h("p", { class: "muted small-text", text: s.fitness ? `Fitness = ${s.fitness}` : "" })));
 
   // The discovered cues, ranked.

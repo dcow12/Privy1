@@ -244,7 +244,8 @@ def _whitebox_thread(job, args):
 EVOLVE_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruct", generations=5,
                        pop=16, tasks=6, layer=None, lam=1.0, elite_frac=0.3, marker_penalty=0.5,
                        neural_ask=12, top_k=5, seed=0, batch_size=None, device=None,
-                       module_paths=None, quick=False)
+                       module_paths=None, quick=False, critic=True, oversample=4,
+                       datasets=None)
 
 
 def start_evolve(name, cfg):

@@ -296,6 +296,8 @@ class EvolveIn(BaseModel):
     lam: float = Field(1.0, ge=0.0, le=5.0)
     layer: int | None = None
     quick: bool = False
+    critic: bool = True
+    oversample: int = Field(4, ge=1, le=12)
 
 
 @app.post("/api/runs/evolve")
@@ -305,7 +307,8 @@ def run_evolve(e: EvolveIn):
     if e.backend == "ndif" and "ndif" not in KEYS:
         raise HTTPException(400, "Add an NDIF key first (free at login.ndif.us).")
     cfg = {"backend": e.backend, "model": e.model.strip(), "generations": e.generations,
-           "pop": e.pop, "tasks": e.tasks, "lam": e.lam, "layer": e.layer, "quick": e.quick}
+           "pop": e.pop, "tasks": e.tasks, "lam": e.lam, "layer": e.layer, "quick": e.quick,
+           "critic": e.critic, "oversample": e.oversample}
     name = (e.name.strip() or ("Cue search (simulated)" if e.backend == "mock"
             else "Cue search · " + e.model.split("/")[-1]))[:120]
     job = jobs.start_evolve(name, cfg)
