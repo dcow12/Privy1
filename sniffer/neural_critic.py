@@ -10,14 +10,18 @@ then becomes new training data, so the critic sharpens each generation.
 
 Training data ("the datasets")
   - every archive.csv from past search runs on the same backend + model (runs/*/ and any
-    --datasets paths), each row a scored (sandbox text, production text, fitness) example;
+    --datasets paths), each row a scored (sandbox text, production text, probe gap, behaviour
+    gap) example. The critic learns the raw gaps, not fitness: fitness is z-scored within each
+    generation's batch, so its scale drifts between generations and runs;
   - every candidate scored so far in the current run.
   Rows from a different backend or model are skipped: their numbers live on a different scale.
 
 Model
   An ensemble of small multilayer perceptrons (sklearn MLPRegressor) over hashed character
   and word n-gram features of the sandbox and production sides. Each member is trained on a
-  bootstrap resample, so the ensemble spread gives an uncertainty estimate; selection ranks by
+  bootstrap resample, so the ensemble spread gives an uncertainty estimate. Predicted gaps are
+  combined into one score on a fixed scale (the training set's mean/sd), the same formula as
+  fitness; selection ranks by
   mean + kappa * spread (an upper-confidence bound), which favours novel, unexplored phrasings.
 
 Honesty check
@@ -78,9 +82,12 @@ def load_prior(backend_name, extra_paths=(), exclude_dir=None, log=print):
             df = pd.read_csv(f)
         except Exception:
             continue
-        df = df[np.isfinite(pd.to_numeric(df.get("fitness"), errors="coerce"))]
+        if not {"probe_gap", "behaviour_gap"} <= set(df.columns):
+            continue
+        df = df[np.isfinite(pd.to_numeric(df["probe_gap"], errors="coerce"))
+                & np.isfinite(pd.to_numeric(df["behaviour_gap"], errors="coerce"))]
         for r in df.itertuples():
-            rows.append((str(r.sandbox), str(r.prod), float(r.fitness)))
+            rows.append((str(r.sandbox), str(r.prod), float(r.probe_gap), float(r.behaviour_gap)))
         sources += 1
     if skipped:
         log(f"  critic: skipped {skipped} past run(s) from a different backend/model.", flush=True)
@@ -91,17 +98,19 @@ def load_prior(backend_name, extra_paths=(), exclude_dir=None, log=print):
 
 class NeuralCritic:
     def __init__(self, n_members=5, hidden=(64, 32), kappa=0.5, explore_frac=0.25,
-                 min_rows=12, seed=0):
+                 min_rows=12, seed=0, lam=1.0, marker_penalty=0.5, hits_fn=None):
         from sklearn.feature_extraction.text import HashingVectorizer
 
         self.n_members, self.hidden, self.kappa = n_members, hidden, kappa
         self.explore_frac, self.min_rows, self.seed = explore_frac, min_rows, seed
+        self.lam, self.marker_penalty = lam, marker_penalty
+        self.hits_fn = hits_fn or (lambda text: 0)
         self._chars = HashingVectorizer(analyzer="char_wb", ngram_range=(3, 5), n_features=2 ** 12,
                                         alternate_sign=False, norm="l2")
         self._words = HashingVectorizer(analyzer="word", ngram_range=(1, 2), n_features=2 ** 11,
                                         alternate_sign=False, norm="l2", token_pattern=r"[A-Za-z0-9_]+")
         self.members, self.n_rows = [], 0
-        self._mu, self._sd = 0.0, 1.0
+        self._mu, self._sd = np.zeros(2), np.ones(2)   # [probe, behaviour]
 
     @property
     def ready(self):
@@ -115,23 +124,30 @@ class NeuralCritic:
         return hstack([self._chars.transform(sb), self._words.transform(sb),
                        self._chars.transform(pr), self._words.transform(pr)]).tocsr()
 
+    def combine(self, probe_gap, behaviour_gap, hits):
+        """Fitness on the critic's fixed scale: z(behaviour) + lam * z(probe) - penalty * hits."""
+        zp = (probe_gap - self._mu[0]) / self._sd[0]
+        zb = (behaviour_gap - self._mu[1]) / self._sd[1]
+        return float(zb + self.lam * zp - self.marker_penalty * hits)
+
     def fit(self, rows):
-        """rows: [(sandbox_text, prod_text, fitness)]. Retrains the ensemble from scratch."""
+        """rows: [(sandbox_text, prod_text, probe_gap, behaviour_gap)]. Retrains from scratch."""
         from sklearn.neural_network import MLPRegressor
 
         # Keep the latest score for any repeated pair.
         uniq = {}
-        for sb, pr, y in rows:
-            if np.isfinite(y):
-                uniq[(sb.lower(), pr.lower())] = (sb, pr, y)
+        for sb, pr, pg, bg in rows:
+            if np.isfinite(pg) and np.isfinite(bg):
+                uniq[(sb.lower(), pr.lower())] = (sb, pr, pg, bg)
         rows = list(uniq.values())
         self.n_rows = len(rows)
         if len(rows) < self.min_rows:
             self.members = []
             return self
-        X = self._features([(sb, pr) for sb, pr, _ in rows])
-        y = np.array([r[2] for r in rows], float)
-        self._mu, self._sd = float(y.mean()), float(y.std() or 1.0)
+        X = self._features([(sb, pr) for sb, pr, _, _ in rows])
+        y = np.array([[r[2], r[3]] for r in rows], float)          # [probe, behaviour]
+        self._mu = y.mean(0)
+        self._sd = np.where(y.std(0) > 1e-9, y.std(0), 1.0)
         yz = (y - self._mu) / self._sd
         rng = np.random.default_rng(self.seed + len(rows))
         self.members = []
@@ -146,13 +162,15 @@ class NeuralCritic:
         return self
 
     def predict(self, pairs):
-        """(mean, spread) of predicted fitness, on the original fitness scale."""
+        """(mean, spread) across the ensemble of the predicted combined score (critic scale)."""
         if not self.members or not pairs:
             n = len(pairs)
             return np.zeros(n), np.zeros(n)
         X = self._features(pairs)
-        P = np.stack([m.predict(X) for m in self.members]) * self._sd + self._mu
-        return P.mean(0), P.std(0)
+        hits = np.array([self.hits_fn(sb + " " + pr) for sb, pr in pairs], float)
+        Z = np.stack([m.predict(X).reshape(len(pairs), 2) for m in self.members])  # (members, n, 2)
+        S = Z[..., 1] + self.lam * Z[..., 0] - self.marker_penalty * hits
+        return S.mean(0), S.std(0)
 
     def select(self, cands, k, rng, keep=()):
         """Pick k candidates: `keep` first (e.g. a reserved slice of model-written ones), then the
