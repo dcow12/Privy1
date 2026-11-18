@@ -32,8 +32,22 @@ function setAttrs(el, attrs) {
    exported as files under data/ by tools/build_pages.py. */
 const STATIC = window.SNIFFER_STATIC === true;
 const DEMO_MSG = "This is a read-only demo of saved runs. To start experiments, clone the repo and run python app.py.";
+/* A random id for this browser. On a shared (public) server it keeps each visitor's keys and runs
+   their own; locally the server ignores it. Kept in localStorage so a reload keeps your runs. */
+const SESSION = (() => {
+  let t = null;
+  try { t = localStorage.getItem("privy-session"); } catch (_) { /* storage blocked */ }
+  if (!t || !/^[0-9a-f]{32}$/.test(t)) {
+    const b = new Uint8Array(16);
+    crypto.getRandomValues(b);
+    t = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    try { localStorage.setItem("privy-session", t); } catch (_) { /* fine: this tab only */ }
+  }
+  return t;
+})();
 function asset(path) {
-  if (!STATIC) return path;
+  // <img> and download links can't send headers, so they carry the session id in the URL.
+  if (!STATIC) return path + (path.includes("?") ? "&" : "?") + "s=" + SESSION;
   const [p] = path.split("?");
   let m;
   if (p === "/api/meta") return "data/meta.json";
@@ -53,7 +67,7 @@ async function api(path, opts = {}) {
     if (!r.ok) throw new Error(`Request failed (${r.status}).`);
     return r.json();
   }
-  const init = { headers: { "Content-Type": "application/json" }, ...opts };
+  const init = { headers: { "Content-Type": "application/json", "X-Privy-Session": SESSION }, ...opts };
   if (init.body && typeof init.body !== "string") init.body = JSON.stringify(init.body);
   let r;
   try { r = await fetch(path, init); }
@@ -173,6 +187,18 @@ function showTab(name, push = true) {
 // ------------------------------------------------------------------ keys
 async function loadMeta() {
   state.meta = await api("/api/meta");
+  if (state.meta.public && !document.body.classList.contains("public")) applyPublicMode();
+}
+
+/* Shared server: hide what it won't run and say how keys and runs are handled. */
+function applyPublicMode() {
+  document.body.classList.add("public");
+  document.querySelectorAll("input[name=wb-backend][value=local], input[name=ev-backend][value=local]")
+    .forEach((el) => el.closest("label").remove());
+  const hrs = state.meta.run_ttl_hours;
+  const note = h("div", { class: "banner", text: "You're on a shared Privy server. Keys you add are held in server memory for your browser session only: never saved to disk, never shown or used for anyone else. Your runs are visible only to you" + (hrs ? ` and are deleted after ${hrs} hours.` : ".") });
+  const tab = document.getElementById("tab-keys");
+  if (tab) tab.prepend(note);
 }
 function providerById(id) { return state.meta.providers.find((p) => p.id === id); }
 

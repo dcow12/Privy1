@@ -1,3 +1,13 @@
+---
+title: Privy
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: Does an AI agent respect the rule, or just the test?
+---
+
 # Privy: can we tell when an agent thinks it's being tested, even when it doesn't say so?
 
 Live demo: https://dcow12.github.io/Privy/ · Run it on a GPU: [`colab/privy_colab.ipynb`](colab/privy_colab.ipynb)
@@ -17,6 +27,25 @@ The key move is the **evaluation-awareness probe**. It's trained only on prompts
 A read-only copy of the app runs on GitHub Pages: **[https://dcow12.github.io/Privy/](https://dcow12.github.io/Privy/)**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
 
 To refresh the demo after new runs: `python tools/build_pages.py` (or name run IDs to include only those), then commit `docs/`. The export never includes API keys.
+
+## Hosting the full app for everyone
+
+The `Dockerfile` runs the full app in **public mode** (`PRIVY_PUBLIC=1`), which makes one server safe to share:
+
+- **Each visitor's keys and runs are their own.** Each browser gets a random session id, and keys are held in server memory under it, never written to disk or used for anyone else. Keys in the server's own environment are ignored, so your keys are never spent by visitors. The Results list shows each visitor only their own runs.
+- **Limits:** one run per visitor at a time, `PRIVY_MAX_JOBS` runs overall (default 3), and caps on run sizes (cue search: 8 generations, population 24, 8 tasks; experiments: 2 repeats, 2 variants, 6 workers). White-box runs use the quick settings.
+- **Disabled:** the "This computer" backend and custom OpenAI-compatible endpoints.
+- **NDIF runs** go one at a time, because nnsight keeps its key in one process-wide setting.
+- **Runs are deleted** after `PRIVY_RUN_TTL_HOURS` (default 24).
+
+**Hugging Face Spaces (free):** create a Space with the **Docker** SDK, then push this repo to it:
+
+```bash
+git remote add space https://huggingface.co/spaces/<your-username>/privy
+git push space neural-cue-search:main
+```
+
+Spaces reads the header block at the top of this README (`sdk: docker`, `app_port: 7860`) and builds the `Dockerfile`. The same image also runs on Render, Railway or Fly.io (`docker run -p 7860:7860 <image>`).
 
 ## The web app
 

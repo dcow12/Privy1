@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import threading
 import time
 import traceback
 import uuid
 from argparse import Namespace
 from collections import deque
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -26,12 +29,16 @@ from .report import markdown, summarize
 RUNS = Path(__file__).resolve().parent.parent / "runs"
 _LIVE: dict[str, "Job"] = {}
 _SUMMARY_LOCK = threading.Lock()
+# nnsight keeps its NDIF key in a process-wide setting, so on a shared server NDIF jobs run one
+# at a time, each with its own visitor's key set only while it runs.
+_NDIF_LOCK = threading.Lock()
 
 
 class Job:
-    def __init__(self, kind, name, config):
+    def __init__(self, kind, name, config, owner=None):
         self.id = datetime.now().strftime("%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
         self.kind, self.name, self.config = kind, name, config
+        self.owner = owner  # hashed visitor session on a public server; None locally
         self.dir = RUNS / self.id
         self.dir.mkdir(parents=True, exist_ok=True)
         self.status, self.error = "running", None
@@ -52,7 +59,7 @@ class Job:
         return {"id": self.id, "kind": self.kind, "name": self.name, "status": self.status,
                 "error": self.error, "created": self.created, "finished": self.finished,
                 "total": self.total, "done": self.done, "errors": self.errors,
-                "config": self.config}
+                "config": self.config, "owner": self.owner}
 
     def save(self):
         (self.dir / "run.json").write_text(json.dumps(self.info(), indent=2))
@@ -94,6 +101,57 @@ def logs(run_id):
     return list(job.logs) if job else []
 
 
+def running_jobs():
+    return [j for j in list(_LIVE.values()) if j.status == "running"]
+
+
+def prune_runs(max_age_hours):
+    """Delete finished runs older than max_age_hours (public servers keep runs temporarily)."""
+    if not RUNS.exists():
+        return
+    cutoff = time.time() - max_age_hours * 3600
+    for d in RUNS.iterdir():
+        live = _LIVE.get(d.name)
+        if live and live.status == "running":
+            continue
+        meta = d / "run.json"
+        try:
+            if meta.exists() and meta.stat().st_mtime < cutoff:
+                shutil.rmtree(d, ignore_errors=True)
+                _LIVE.pop(d.name, None)
+        except OSError:
+            pass
+
+
+@contextmanager
+def _backend_creds(job, backend, creds):
+    """creds=None: single-user mode, keys already live in the environment. Otherwise hold the
+    NDIF lock for the whole job and expose only this visitor's keys while it runs."""
+    if creds is None or backend != "ndif":
+        yield
+        return
+    if not _NDIF_LOCK.acquire(blocking=False):
+        job.log("Waiting for another visitor's NDIF run to finish (they run one at a time)...")
+        while not _NDIF_LOCK.acquire(timeout=5):
+            if job.cancel.is_set():
+                raise RuntimeError("Cancelled")
+    saved = {k: os.environ.get(k) for k in ("NDIF_API_KEY", "HF_TOKEN")}
+    try:
+        for env, val in (("NDIF_API_KEY", creds.get("ndif")), ("HF_TOKEN", creds.get("hf"))):
+            if val:
+                os.environ[env] = val
+            else:
+                os.environ.pop(env, None)
+        yield
+    finally:
+        for env, val in saved.items():
+            if val is None:
+                os.environ.pop(env, None)
+            else:
+                os.environ[env] = val
+        _NDIF_LOCK.release()
+
+
 def cancel(run_id):
     job = _LIVE.get(run_id)
     if job and job.status == "running":
@@ -105,11 +163,11 @@ def cancel(run_id):
 
 # --------------------------------------------------------------------------- agents
 
-def start_agents(name, slots, cfg, anthropic_key=None):
+def start_agents(name, slots, cfg, anthropic_key=None, owner=None):
     """slots carry API keys; they're used in memory only and never written to run.json."""
     public_slots = [{k: v for k, v in s.items() if k not in ("key",)} for s in slots]
     cfg = {**cfg, "slots": public_slots}
-    job = Job("agents", name, cfg)
+    job = Job("agents", name, cfg, owner)
     rows = make_rows(cfg)
     job.total = len(rows) * cfg["repeats"] * len(slots)
     job.save()
@@ -211,8 +269,8 @@ WHITEBOX_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruc
                          steer_n=32, n_random=3, mults="-8,-4,-2,2,4,8", quick=False)
 
 
-def start_whitebox(name, cfg, anthropic_key=None):
-    job = Job("whitebox", name, cfg)
+def start_whitebox(name, cfg, anthropic_key=None, owner=None, creds=None):
+    job = Job("whitebox", name, cfg, owner)
     args = Namespace(**{**WHITEBOX_DEFAULTS, **cfg})
     if args.quick:
         args.variants, args.verbal_n, args.steer_n, args.mults = 1, 48, 16, "-8,-4,4,8"
@@ -220,15 +278,16 @@ def start_whitebox(name, cfg, anthropic_key=None):
         args.judge = "regex"
     args.out = str(job.dir)
     args.anthropic_key = anthropic_key
-    threading.Thread(target=_whitebox_thread, args=(job, args), daemon=True).start()
+    threading.Thread(target=_whitebox_thread, args=(job, args, creds), daemon=True).start()
     return job
 
 
-def _whitebox_thread(job, args):
+def _whitebox_thread(job, args, creds=None):
     from . import whitebox
     try:
         t0 = time.time()
-        whitebox.run(args, log=job.log, should_stop=job.cancel.is_set)
+        with _backend_creds(job, args.backend, creds):
+            whitebox.run(args, log=job.log, should_stop=job.cancel.is_set)
         job.log(f"Finished in {time.time() - t0:.0f}s.")
         job.finish("done")
     except BaseException as e:  # SystemExit from config problems should surface too
@@ -248,21 +307,21 @@ EVOLVE_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruct"
                        datasets=None)
 
 
-def start_evolve(name, cfg):
+def start_evolve(name, cfg, owner=None, creds=None):
     args = Namespace(**{**EVOLVE_DEFAULTS, **cfg})
     if args.quick:
         args.generations, args.pop, args.tasks = 3, 10, 4
     # Store the effective settings so the report's chips match what actually ran.
     cfg = {**cfg, "generations": args.generations, "pop": args.pop, "tasks": args.tasks}
-    job = Job("evolve", name, cfg)
+    job = Job("evolve", name, cfg, owner)
     job.total = args.generations
     args.out = str(job.dir)
     job.save()
-    threading.Thread(target=_evolve_thread, args=(job, args), daemon=True).start()
+    threading.Thread(target=_evolve_thread, args=(job, args, creds), daemon=True).start()
     return job
 
 
-def _evolve_thread(job, args):
+def _evolve_thread(job, args, creds=None):
     from . import evolve
 
     def log(*parts, **_):
@@ -278,7 +337,8 @@ def _evolve_thread(job, args):
 
     try:
         t0 = time.time()
-        evolve.run(args, log=log, should_stop=job.cancel.is_set)
+        with _backend_creds(job, args.backend, creds):
+            evolve.run(args, log=log, should_stop=job.cancel.is_set)
         job.done = job.total
         job.log(f"Finished in {time.time() - t0:.0f}s.")
         job.finish("done")
