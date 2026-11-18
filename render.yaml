@@ -1,0 +1,15 @@
+# Render blueprint: runs the full Privy app (public mode) from the Dockerfile.
+# Render sets PORT itself; app.py listens on it. Free instances pause after 15 idle minutes.
+services:
+  - type: web
+    name: privy
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /api/meta
+    envVars:
+      - key: PRIVY_PUBLIC
+        value: "1"
+      - key: PRIVY_MAX_JOBS
+        value: "2"
