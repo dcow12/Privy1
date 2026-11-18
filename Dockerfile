@@ -18,6 +18,8 @@ RUN pip install torch --index-url https://download.pytorch.org/whl/cpu \
  && pip install -r requirements.txt
 
 COPY --chown=user . .
+# WORKDIR made the folder itself as root; the app writes runs/ here, so hand it to the user.
+RUN mkdir -p runs && chown user:user . runs
 USER user
 
 EXPOSE 7860
