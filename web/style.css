@@ -391,3 +391,5 @@ mark { background: var(--mark); color: inherit; padding: 0 2px; }
 /* GitHub Pages demo notice */
 .demo-note { background: #fff; border: 1px solid var(--rule); border-left-width: 1px; padding: 12px 18px; margin-bottom: 20px; font-size: 15px; color: var(--ink-2); }
 .demo-note b { color: var(--ink); }
+.measures.cues .ci { white-space: nowrap; }
+.measures.cues .ci-zero { color: var(--warning); }
