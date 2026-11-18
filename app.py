@@ -472,7 +472,18 @@ def run_summary(run_id: str):
     s = jobs.summary(run_id)
     if s is None:
         raise HTTPException(404, "No results yet")
-    return s
+    return _no_nan(s)
+
+
+def _no_nan(x):
+    """Summaries can hold NaN (an undefined statistic); JSON can't, so send null instead."""
+    if isinstance(x, float):
+        return None if x != x or x in (float("inf"), float("-inf")) else x
+    if isinstance(x, dict):
+        return {k: _no_nan(v) for k, v in x.items()}
+    if isinstance(x, list):
+        return [_no_nan(v) for v in x]
+    return x
 
 
 @app.get("/api/runs/{run_id}/episodes")

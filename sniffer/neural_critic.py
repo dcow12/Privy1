@@ -42,10 +42,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------------------------------- dataset
 
-def _archive_files(extra_paths=()):
-    """Every archive.csv under runs/, results_evolved*/ and any user-given dirs/files."""
+def _archive_files(extra_paths=(), include_defaults=True):
+    """Every archive.csv under runs/, results_evolved*/ and any user-given dirs/files.
+    include_defaults=False reads only extra_paths (a shared server passes the visitor's own runs)."""
     found = set()
-    for p in list((ROOT / "runs").glob("*/archive.csv")) + list(ROOT.glob("results_evolved*/archive.csv")):
+    defaults = (list((ROOT / "runs").glob("*/archive.csv")) + list(ROOT.glob("results_evolved*/archive.csv"))
+                if include_defaults else [])
+    for p in defaults:
         found.add(p.resolve())
     for raw in extra_paths or ():
         p = Path(raw).expanduser()
@@ -66,13 +69,13 @@ def _source_backend(csv_path: Path):
         return None
 
 
-def load_prior(backend_name, extra_paths=(), exclude_dir=None, log=print):
+def load_prior(backend_name, extra_paths=(), exclude_dir=None, log=print, include_defaults=True):
     """Scored rows from earlier runs whose backend matches this one. Returns (rows, n_sources)."""
     import pandas as pd
 
     rows, sources, skipped = [], 0, 0
     exclude = Path(exclude_dir).resolve() if exclude_dir else None
-    for f in _archive_files(extra_paths):
+    for f in _archive_files(extra_paths, include_defaults):
         if exclude and f.parent == exclude:
             continue
         if _source_backend(f) != backend_name:
