@@ -307,6 +307,13 @@ EVOLVE_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruct"
                        datasets=None)
 
 
+def _owned_by(run_dir, owner):
+    try:
+        return json.loads((run_dir / "run.json").read_text()).get("owner") == owner
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
 def start_evolve(name, cfg, owner=None, creds=None):
     args = Namespace(**{**EVOLVE_DEFAULTS, **cfg})
     if args.quick:
@@ -314,6 +321,10 @@ def start_evolve(name, cfg, owner=None, creds=None):
     # Store the effective settings so the report's chips match what actually ran.
     cfg = {**cfg, "generations": args.generations, "pop": args.pop, "tasks": args.tasks}
     job = Job("evolve", name, cfg, owner)
+    if owner:
+        # Shared server: the critic learns only from this visitor's own past searches.
+        args.private_datasets = True
+        args.datasets = [str(d) for d in RUNS.iterdir() if d != job.dir and _owned_by(d, owner)]
     job.total = args.generations
     args.out = str(job.dir)
     job.save()

@@ -347,7 +347,7 @@ def evolve(backend, corpus, rng, *, generations, pop, n_tasks, layer, lam, elite
                         "best_probe_gap": float(best.probe_gap),
                         "best_behaviour_gap": float(best.behaviour_gap),
                         "n_neural": sum(c.origin == "neural" for c in population),
-                        "critic_corr": corr,
+                        "critic_corr": corr if np.isfinite(corr) else None,  # JSON has no NaN
                         "critic_rows": critic.n_rows if critic is not None else 0})
         log(f"  best fitness {best.fitness:+.2f} | probe gap {best.probe_gap:+.3f} | "
             f"behaviour gap {best.behaviour_gap:+.3f} | from {best.origin}", flush=True)
@@ -561,7 +561,8 @@ def run(args, log=print, should_stop=lambda: False):
     if getattr(args, "critic", True):
         from .neural_critic import NeuralCritic, load_prior
         prior, n_src = load_prior(backend.name, getattr(args, "datasets", None) or (),
-                                  exclude_dir=out, log=log)
+                                  exclude_dir=out, log=log,
+                                  include_defaults=not getattr(args, "private_datasets", False))
         critic = NeuralCritic(seed=args.seed, lam=args.lam, marker_penalty=args.marker_penalty,
                               hits_fn=lambda text: count_markers(text, corpus["forbidden_markers"]))
         args._critic_info = {"prior_rows": len(prior), "prior_sources": n_src,
