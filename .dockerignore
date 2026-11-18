@@ -1,0 +1,15 @@
+.git
+.env
+.venv
+.claude
+.impeccable
+__pycache__
+*.pyc
+*.npz
+.DS_Store
+node_modules
+runs
+results*
+colab
+docs
+starter
