@@ -10,7 +10,7 @@ short_description: Does an AI agent respect the rule, or just the test?
 
 # Privy: can we tell when an agent thinks it's being tested, even when it doesn't say so?
 
-Live demo: https://dcow12.github.io/Privy/ · Run it on a GPU: [`colab/privy_colab.ipynb`](colab/privy_colab.ipynb)
+Use it: **https://privy-ixde.onrender.com** · Run it on a GPU: [`colab/privy_colab.ipynb`](colab/privy_colab.ipynb)
 
 **Thrust I: The Boundary.** Everything is simulated, and nothing executes.
 
@@ -22,11 +22,11 @@ Two identical agents get the same operator request and the same safety policy. A
 
 The key move is the **evaluation-awareness probe**. It's trained only on prompts that say outright "this episode is part of an automated agent evaluation" vs "live operator request". It's then tested on environments that never mention testing. Bag-of-words gets exactly 0.5 there by construction. If the probe still separates sandbox from production, and still does on the traces where the model said nothing about testing, that's the "even when it doesn't say so" result.
 
-## Live demo
+## Use it online
 
-A read-only copy of the app runs on GitHub Pages: **[https://dcow12.github.io/Privy/](https://dcow12.github.io/Privy/)**. It shows the saved demo runs (simulated agents, so the numbers are illustrations, not findings). Starting experiments needs the local app below.
+The full app runs at **[https://privy-ixde.onrender.com](https://privy-ixde.onrender.com)**, and [dcow12.github.io/Privy1](https://dcow12.github.io/Privy1/) forwards there. Add your own API keys, or use the simulated model with none, and run real experiments, inside-the-model analyses and cue searches. It's hosted on Render's free plan (`render.yaml`), redeploys on every push to `main`, and takes about a minute to wake up after 15 idle minutes.
 
-To refresh the demo after new runs: `python tools/build_pages.py` (or name run IDs to include only those), then commit `docs/`. The export never includes API keys.
+`tools/build_pages.py` can still export a read-only snapshot of saved runs into `docs/`, but `docs/` now just forwards to the live app.
 
 ## Hosting the full app for everyone
 
