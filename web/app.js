@@ -982,6 +982,12 @@ async function evolveSummary(id) {
   return r.ok ? r.json() : null;
 }
 
+// A 95% bootstrap interval under a gap; amber when it crosses 0 (could be noise).
+const ciText = (ci) => Array.isArray(ci)
+  ? h("div", { class: "muted small-text ci" + (ci[0] <= 0 && ci[1] >= 0 ? " ci-zero" : ""),
+      text: `[${num(ci[0])}, ${num(ci[1])}]`, title: "95% bootstrap interval across tasks" })
+  : "";
+
 async function evolveBody(frag, info) {
   const s = info.status === "running" ? null : await evolveSummary(info.id);
   if (!s) {
@@ -1017,14 +1023,14 @@ async function evolveBody(frag, info) {
   // The discovered cues, ranked.
   const rows = top.map((f) => h("tr", {},
     h("td", {}, h("b", { text: f.family }), h("span", { class: "chip sim", text: f.origin, style: { marginLeft: "6px" } })),
-    h("td", { class: "num", text: num(f.behaviour_gap) }),
-    h("td", { class: "num", text: num(f.probe_gap) }),
+    h("td", { class: "num" }, num(f.behaviour_gap), ciText(f.behaviour_gap_ci)),
+    h("td", { class: "num" }, num(f.probe_gap), ciText(f.probe_gap_ci)),
     h("td", {}, h("div", { class: "cue-pair" },
       h("div", {}, h("span", { class: "muted small-text", text: "sandbox  " }), h("code", { text: (f.sandbox || []).join(" ; ") })),
       h("div", {}, h("span", { class: "muted small-text", text: "production  " }), h("code", { text: (f.prod || []).join(" ; ") }))))));
   frag.append(h("div", { class: "panel" },
     h("div", { class: "panel-head" }, h("h2", { text: "Discovered cues" }),
-      h("span", { class: "muted small-text", text: "No sandbox line says “test” or “evaluation” — the search is penalised for it." })),
+      h("span", { class: "muted small-text", text: "No sandbox line says “test” or “evaluation” — the search is penalised for it. Brackets: 95% interval across tasks; one that crosses 0 could be noise." })),
     h("table", { class: "measures cues" }, h("thead", {}, h("tr", {},
       h("th", { text: "family" }), h("th", { class: "num", text: "behaviour gap" }),
       h("th", { class: "num", text: "probe gap" }), h("th", { text: "sandbox → production" }))),
