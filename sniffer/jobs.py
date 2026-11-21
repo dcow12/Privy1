@@ -304,7 +304,7 @@ EVOLVE_DEFAULTS = dict(backend="mock", model="meta-llama/Llama-3.3-70B-Instruct"
                        pop=16, tasks=6, layer=None, lam=1.0, elite_frac=0.3, marker_penalty=0.5,
                        neural_ask=12, top_k=5, seed=0, batch_size=None, device=None,
                        module_paths=None, quick=False, critic=True, oversample=4,
-                       datasets=None)
+                       datasets=None, holdout_tasks=6)
 
 
 def _owned_by(run_dir, owner):
