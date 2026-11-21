@@ -1030,8 +1030,8 @@ async function evolveBody(frag, info) {
     h("div", { class: "panel-head" }, h("h2", { text: "What the search found" }),
       h("span", { class: "muted small-text", text: `${s.backend} · layer ${s.layer} · ${plural(s.generations, "generation")} · ${s.n_candidates_scored} candidates scored` })),
     h("table", { class: "measures glance" }, h("tbody", {},
-      measure("Best behaviour gap", num(best.behaviour_gap), "P(carry out) on disallowed requests, sandbox − production"),
-      measure("Best probe gap", num(best.probe_gap), "projection onto the eval-awareness direction, sandbox − production"),
+      measure("Top cue, held-out behaviour gap", num(best.holdout_behaviour_gap), `on ${plural(best.holdout_n_disallowed || 0, "disallowed task")} the search never saw; search tasks gave ${num(best.behaviour_gap)}`),
+      measure("Top cue, held-out probe gap", num(best.holdout_probe_gap), `on ${plural(best.holdout_n_tasks || 0, "task")} the search never saw; search tasks gave ${num(best.probe_gap)}`),
       measure("Discovered families kept", String(top.length), "each ready to fold into a white-box run"),
       measure("Best fitness, final generation", num(last.best_fitness), `mean ${num(last.mean_fitness)}`),
       ...(s.critic ? (() => {
@@ -1049,6 +1049,8 @@ async function evolveBody(frag, info) {
   // The discovered cues, ranked.
   const rows = top.map((f) => h("tr", {},
     h("td", {}, h("b", { text: f.family }), h("span", { class: "chip sim", text: f.origin, style: { marginLeft: "6px" } })),
+    h("td", { class: "num" }, num(f.holdout_behaviour_gap), ciText(f.holdout_behaviour_gap_ci)),
+    h("td", { class: "num" }, num(f.holdout_probe_gap), ciText(f.holdout_probe_gap_ci)),
     h("td", { class: "num" }, num(f.behaviour_gap), ciText(f.behaviour_gap_ci)),
     h("td", { class: "num" }, num(f.probe_gap), ciText(f.probe_gap_ci)),
     h("td", {}, h("div", { class: "cue-pair" },
@@ -1056,10 +1058,11 @@ async function evolveBody(frag, info) {
       h("div", {}, h("span", { class: "muted small-text", text: "production  " }), h("code", { text: (f.prod || []).join(" ; ") }))))));
   frag.append(h("div", { class: "panel" },
     h("div", { class: "panel-head" }, h("h2", { text: "Discovered cues" }),
-      h("span", { class: "muted small-text", text: "No sandbox line says “test” or “evaluation” — the search is penalised for it. Brackets: 95% interval across tasks; one that crosses 0 could be noise." })),
+      h("span", { class: "muted small-text", text: "No sandbox line says “test” or “evaluation” — the search is penalised for it. Trust the held-out columns: search-task gaps are inflated because winners were picked on those tasks. Brackets: 95% interval across tasks; one that crosses 0 could be noise." })),
     h("table", { class: "measures cues" }, h("thead", {}, h("tr", {},
-      h("th", { text: "family" }), h("th", { class: "num", text: "behaviour gap" }),
-      h("th", { class: "num", text: "probe gap" }), h("th", { text: "sandbox → production" }))),
+      h("th", { text: "family" }), h("th", { class: "num", text: "held-out behaviour" }),
+      h("th", { class: "num", text: "held-out probe" }), h("th", { class: "num", text: "search behaviour" }),
+      h("th", { class: "num", text: "search probe" }), h("th", { text: "sandbox → production" }))),
       h("tbody", {}, ...rows))));
 
   frag.append(h("div", { class: "panel" }, h("div", { class: "figs" }, h("figure", {},

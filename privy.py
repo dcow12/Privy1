@@ -99,6 +99,8 @@ def main():
     ev.add_argument("--top-k", type=int, default=5, help="discovered families to keep")
     ev.add_argument("--no-critic", dest="critic", action="store_false",
                     help="turn off the neural critic that picks which candidates to score")
+    ev.add_argument("--holdout-tasks", type=int, default=6,
+                    help="tasks kept out of the search and used only to test the winners (0 = off)")
     ev.add_argument("--oversample", type=int, default=4,
                     help="candidates generated per slot for the critic to choose from")
     ev.add_argument("--datasets", nargs="*", default=None,
